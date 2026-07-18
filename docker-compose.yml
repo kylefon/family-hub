@@ -1,0 +1,35 @@
+services:
+  family-hub:
+    build: .
+    container_name: family-hub
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Manila  # Set the timezone (change to your preferred local timezone so moni>
+    networks:
+      - homelab
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:17
+    container_name: family-hub-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    volumes:
+      - ./db-data/:/var/lib/postgresql/data
+    networks:
+      - homelab
+
+networks:
+  homelab:
+    external: true

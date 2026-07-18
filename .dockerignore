@@ -1,0 +1,11 @@
+db-data/
+
+.env
+
+__pycache__/
+*.pyc
+
+.git
+.gitignore
+
+README.md

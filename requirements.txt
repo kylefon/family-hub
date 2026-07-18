@@ -1,0 +1,5 @@
+python-telegram-bot==22.2
+sqlalchemy==2.0.51
+psycopg[binary]==3.2.9
+python-dotenv
+
