@@ -16,6 +16,9 @@ from services.add_reminder import add_reminder
 from services.reminder_worker import delete_reminder, get_due_reminders, get_group_id
 from services.list_reminder import list_reminders
 from services.remove_reminder import remove_reminder
+from services.add_categories import add_categories
+from services.list_categories import list_categories
+from services.remove_categories import remove_categories
 
 print('Bot is now starting...')
 
@@ -187,6 +190,76 @@ async def reminder_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Error occured")
 
+async def category_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user, group = initialize_context(update.effective_user, update.effective_chat)
+
+    if not context.args:
+        await update.message.reply_text("Commands: add list or remove \nExample: /shopping add Milk")
+        return
+
+    text = update.message.text
+
+    try:
+        if not user.is_allowed:
+            await update.message.reply_text("BAWAL KA. PA-APPROVE KA MUNA KAY BOSSING")
+            return
+
+        command_input = context.args
+
+        match command_input:
+            case ['add', *item]:
+                if len(context.args) < 2:
+                    await update.message.reply_text("Please add an item. Example: /category add Baguio Trip")
+                    return
+
+                items = text.removeprefix("/category add").strip()
+
+                to_add = [item.strip().lower() for item in items.split(",")]
+
+                existing_items, add_items, item_exists = add_categories(user, group, to_add)
+                if item_exists and not add_items:
+                    await update.message.reply_text(f"{list_to_comma_separated(existing_items)} already exists. Please add other items.")
+                    return
+                if not item_exists and not existing_items:
+                    await update.message.reply_text(f"Done adding {list_to_comma_separated(add_items)}.")
+                    return
+                await update.message.reply_text(f"Done adding {list_to_comma_separated(add_items)}. {list_to_comma_separated(existing_items)} already exists")
+                return
+            case ['list']:
+                category_items, items_exists = list_categories(user, group)
+                if items_exists:
+                    category_list = []
+                    for items in category_items:
+                        category_list.append(items.name)
+                    all_category_items = "\n".join(category_list)
+                    await update.message.reply_text(f"Here is your category list:\n{all_category_items}")
+                    return
+                await update.message.reply_text("wala naman laman list mo hahah. Lagay ka muna /category add category_name")
+                return
+            case ['remove', *_]:
+                if len(context.args) < 2:
+                    await update.message.reply_text("Please add item/s to remove. \nExample: /category remove Baguio Trip")
+                    return
+
+                items = text.removeprefix("/category remove").strip()
+
+                to_delete = [item.strip() for item in items.split(",")]
+
+                category_items, items_exists = remove_categories(user, group, to_delete)
+
+                if items_exists:
+                    sorted_items = "\n".join(category_items)
+                    await update.message.reply_text(f"You will be deleting:\n{sorted_items}")
+                    return
+
+                await update.message.reply_text("nothing to delete")
+                return
+            case _:
+                await update.message.reply_text("Unknown command")
+
+    except ValueError:
+        await update.message.reply_text("Error occured")
+
 
 async def reminder_service(context: ContextTypes.DEFAULT_TYPE):
     reminders = get_due_reminders()
@@ -220,7 +293,7 @@ if __name__ == '__main__':
     # Register command handlers
     app.add_handler(CommandHandler('shopping', shopping_command))
     app.add_handler(CommandHandler('reminder', reminder_command))
-    #app.add_handler(CommandHandler('custom', personalize_command))
+    app.add_handler(CommandHandler('category', category_command))
 
     app.job_queue.run_repeating(reminder_service, interval=60,first=0)
 

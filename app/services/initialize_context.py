@@ -2,6 +2,7 @@ from sqlalchemy import select
 
 from database.base import Session
 from database.models import User, Group, GroupMember
+from .seed_categories import seed_categories
 
 def get_or_create_user(session, effective_user):
     existing = select(User).where(User.telegram_id==effective_user.id)
@@ -47,6 +48,7 @@ def initialize_context(effective_user, effective_chat):
         group = get_or_create_group(session, effective_chat)
         session.flush()
         get_or_create_group_member(session, user, group)
+        seed_categories(session, group, user)
         session.commit()
         return user, group
 
