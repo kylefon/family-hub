@@ -19,6 +19,7 @@ from services.remove_reminder import remove_reminder
 from services.add_categories import add_categories
 from services.list_categories import list_categories
 from services.remove_categories import remove_categories
+from services.sinking_fund import add_sinking_fund, list_sinking_funds, remove_sinking_funds
 
 print('Bot is now starting...')
 
@@ -260,6 +261,78 @@ async def category_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Error occured")
 
+async def fund_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user, group = initialize_context(update.effective_user, update.effective_chat)
+
+    if not context.args:
+        await update.message.reply_text("Commands: add list or remove \nExample: /fund add Japan Trip 25000")
+        return
+
+    text = update.message.text
+
+    try:
+        if not user.is_allowed:
+            await update.message.reply_text("BAWAL KA. PA-APPROVE KA MUNA KAY BOSSING")
+            return
+
+        command_input = context.args
+
+        match command_input:
+            case ['create', *item]:
+                if len(context.args) < 2:
+                    await update.message.reply_text("Please create a sinking fund. Example: /fund create Baguio Trip 3000")
+                    return
+
+                items = text.removeprefix("/fund create").strip()
+
+                to_add = [item.strip().lower() for item in items.split(",")]
+
+                existing_items, add_items, invalid_items, item_exists = add_sinking_fund(user, group, to_add)
+                if invalid_items:
+                    invalid_list = "\n".join(invalid_items)
+                    await update.message.reply_text(f"Invalid items:\n{invalid_list}\n\nPlease follow format:/fund add fund name NUMBER")
+                if item_exists and not add_items:
+                    await update.message.reply_text(f"{list_to_comma_separated(existing_items)} already exists. Please add other items.")
+                    return
+                if not item_exists and not existing_items:
+                    await update.message.reply_text(f"Done adding {list_to_comma_separated(add_items)}.")
+                    return
+                await update.message.reply_text(f"Done adding {list_to_comma_separated(add_items)}. {list_to_comma_separated(existing_items)} already exists")
+                return
+            case ['list']:
+                sinking_funds, items_exists = list_sinking_funds(user, group)
+                if items_exists:
+                    fund_list = []
+                    for items in sinking_funds:
+                        fund_list.append([items.name, items.goal])
+                    all_sinking_funds = "\n".join(f"{name}: {goal}" for name, goal in fund_list)
+                    await update.message.reply_text(f"Here are your sinking funds:\n{all_sinking_funds}")
+                    return
+                await update.message.reply_text("wala naman laman list mo hahah. Lagay ka muna /fund add fund name 300000")
+                return
+            case ['remove', *_]:
+                if len(context.args) < 2:
+                    await update.message.reply_text("Please add item/s to remove. \nExample: /fund remove Baguio Trip")
+                    return
+
+                items = text.removeprefix("/fund remove").strip()
+
+                to_delete = [item.strip() for item in items.split(",")]
+
+                sinking_funds, items_exists = remove_sinking_funds(user, group, to_delete)
+
+                if items_exists:
+                    sorted_items = "\n".join(sinking_funds)
+                    await update.message.reply_text(f"You will be deleting:\n{sorted_items}")
+                    return
+
+                await update.message.reply_text("nothing to delete")
+                return
+            case _:
+                await update.message.reply_text("Unknown command")
+
+    except ValueError:
+        await update.message.reply_text("Error occured")
 
 async def reminder_service(context: ContextTypes.DEFAULT_TYPE):
     reminders = get_due_reminders()
@@ -274,9 +347,6 @@ async def reminder_service(context: ContextTypes.DEFAULT_TYPE):
 
 async def personalize_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("personalize command")
-
-async def fund_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("fund command")
 
 # Log errors
 async def log_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -294,6 +364,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('shopping', shopping_command))
     app.add_handler(CommandHandler('reminder', reminder_command))
     app.add_handler(CommandHandler('category', category_command))
+    app.add_handler(CommandHandler('fund', fund_command))
 
     app.job_queue.run_repeating(reminder_service, interval=60,first=0)
 
